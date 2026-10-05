@@ -11,10 +11,20 @@ class PlayerError(RuntimeError):
     """Indica que o reprodutor nao pode ser controlado."""
 
 
+def _default_audio_device() -> str:
+    """Device ALSA onde o som realmente sai neste Pi.
+
+    O teste que funcionou foi ``plughw:3,0`` (bcm2835 Headphones / jack).
+    Pode sobrescrever com ``MPV_AUDIO_DEVICE`` no .env.
+    """
+    return os.environ.get("MPV_AUDIO_DEVICE", "alsa/plughw:3,0").strip()
+
+
 class Player:
-    def __init__(self) -> None:
+    def __init__(self, audio_device: str | None = None) -> None:
         self.process: subprocess.Popen[bytes] | None = None
         self.socket_path = "/tmp/ai_music_player.sock"
+        self.audio_device = audio_device or _default_audio_device()
 
     def play(self, url: str) -> None:
         """Inicia uma nova reproducao, encerrando a anterior."""
@@ -30,6 +40,8 @@ class Player:
                 "--no-video",
                 "--really-quiet",
                 f"--input-ipc-server={self.socket_path}",
+                f"--audio-device={self.audio_device}",
+                "--volume=90",
                 url,
             ],
             stdin=subprocess.DEVNULL,
