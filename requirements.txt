@@ -1,2 +1,6 @@
 vosk>=0.3.45
 sounddevice>=0.4.6
+openai>=1.40.0
+python-dotenv>=1.0.0
+# GPIO do buzzer: use o pacote do sistema (nao pip):
+#   sudo apt install -y python3-lgpio
