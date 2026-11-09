@@ -5,12 +5,14 @@ import unicodedata
 
 
 # "jarvis" costuma sair errado no Vosk PT; incluir variantes comuns.
+# No modelo small-pt so "assistente" e "jarbas" existem no vocabulario.
 WAKE_WORDS = (
     "jarvis",
     "jarves",
     "jarbas",
     "assistente",
     "assistencia",
+    "assistent",
 )
 
 _ACTION_WORDS = {

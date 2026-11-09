@@ -1,0 +1,20 @@
+[Unit]
+Description=AI Music Player Wi-Fi bootstrap (MAUA -> Leonardo -> Apto_163)
+Documentation=file:///home/admin/AI_MusicPlayer-MicrocontroladoresT2/scripts/connect_wifi.py
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/AI_MusicPlayer-MicrocontroladoresT2
+Environment=PYTHONUNBUFFERED=1
+# Aguarda o NM ficar utilizavel antes do primeiro scan
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/admin/AI_MusicPlayer-MicrocontroladoresT2/.venv/bin/python -m scripts.connect_wifi --bootstrap
+RemainAfterExit=yes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

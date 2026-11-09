@@ -1,15 +1,16 @@
-"""Loop principal do tocador de musica."""
+"""Entry point: dashboard FastAPI + motor de voz controlavel."""
+
+from __future__ import annotations
 
 import os
+import threading
 
 from dotenv import load_dotenv
 
-from .command_parser import parse_command
-from .openai_transcribe import TranscriptionError, transcribe_audio
-from .player import Player, PlayerError
-from .speaker_beep import SpeakerBeep, SpeakerBeepError
-from .voice_recognition import VoiceRecognitionError, VoiceRecognizer
-from .youtube_search import YouTubeSearchError, find_audio_url
+from .app_state import AppState
+from .dashboard import create_app
+from .player import Player
+from .voice_engine import VoiceEngine
 
 
 def respond(message: str) -> None:
@@ -19,7 +20,6 @@ def respond(message: str) -> None:
 def run() -> None:
     load_dotenv()
 
-    model_path = os.environ.get("VOSK_MODEL_PATH", "models/vosk-model-small-pt-0.3")
     if not os.environ.get("OPENAI_API_KEY", "").strip():
         respond(
             "Defina OPENAI_API_KEY no arquivo .env (veja .env.example) "
@@ -27,96 +27,67 @@ def run() -> None:
         )
         return
 
+    port = int(os.environ.get("DASHBOARD_PORT", "8080"))
+    host = os.environ.get("DASHBOARD_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    autostart = os.environ.get("ENGINE_AUTOSTART", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+    state = AppState()
+    player = Player()
+    state.audio_device = player.audio_device
+    engine = VoiceEngine(state, player, respond=respond)
+    app = create_app(state, player, engine)
+
     try:
-        recognizer = VoiceRecognizer(model_path)
-    except VoiceRecognitionError as error:
-        respond(str(error))
+        import uvicorn
+    except ImportError:
+        respond(
+            "Instale as dependencias do dashboard: "
+            "pip install -r requirements.txt"
+        )
         return
 
-    beep = None
-    try:
-        beep = SpeakerBeep()
-    except SpeakerBeepError as error:
-        respond(f"Bip de speaker indisponivel ({error}). Seguindo sem bip.")
-
-    player = Player()
-    respond(
-        f"Pronto. Microfone: {recognizer.device_name} "
-        f"({recognizer.device_sample_rate} Hz, ganho x{recognizer.mic_gain:g})."
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="warning",
+        access_log=False,
     )
-    if beep is not None:
-        respond(f"Feedback: alto-falante ({beep.device_name}).")
-    respond(f"Musica: mpv audio-device={player.audio_device}")
-    respond(
-        'Diga a wake word ("assistente" / "jarvis") e em seguida o comando. '
-        'Ex.: "assistente, toque evidencias".'
-    )
+    server = uvicorn.Server(config)
+
+    def _serve() -> None:
+        server.run()
+
+    thread = threading.Thread(target=_serve, name="dashboard", daemon=True)
+    thread.start()
+
+    token = os.environ.get("DASHBOARD_TOKEN", "").strip()
+    respond(f"Dashboard em http://{host}:{port}/")
+    if token:
+        respond("Auth: use ?token=... ou Authorization Bearer (DASHBOARD_TOKEN).")
+    else:
+        respond(
+            "DASHBOARD_TOKEN nao definido — dashboard so aceita localhost. "
+            "Defina no .env antes de usar ngrok."
+        )
+    if autostart:
+        engine.start()
+        respond("Motor de voz: autostart ligado.")
+    else:
+        respond("Motor de voz parado. Use Start no dashboard ou ENGINE_AUTOSTART=1.")
+
     try:
-        while True:
-            respond("Aguardando wake word...")
-            wake_text = recognizer.listen_for_wake()
-            if not wake_text:
-                continue
-
-            if beep is not None:
-                try:
-                    beep.beep(count=1)
-                except SpeakerBeepError as error:
-                    respond(f"Falha no bip: {error}")
-
-            respond(f"Ativado ({wake_text}). Fale o comando...")
-            clip = recognizer.record_command_clip()
-            if not clip:
-                respond("Nao ouvi o comando. Tente de novo.")
-                continue
-
-            try:
-                text = transcribe_audio(clip)
-            except TranscriptionError as error:
-                respond(str(error))
-                continue
-
-            if not text:
-                respond("Nao entendi o audio. Fale mais perto / mais alto.")
-                continue
-
-            respond(f"Ouvi: {text}")
-            command = parse_command(text)
-            action = command["action"]
-
-            if action == "aguardar":
-                respond("Estou ouvindo. Diga o comando apos a wake word.")
-                continue
-            if action == "tocar":
-                respond(f"Buscando: {command['query']}")
-                try:
-                    player.play(find_audio_url(command["query"]))
-                    respond("Reproducao iniciada.")
-                except (PlayerError, YouTubeSearchError) as error:
-                    respond(str(error))
-            elif action == "pausar":
-                player.pause()
-                respond("Reproducao pausada.")
-            elif action == "continuar":
-                player.resume()
-                respond("Reproducao retomada.")
-            elif action == "proxima":
-                player.next()
-                respond("Avancando para a proxima musica.")
-            elif action == "parar":
-                player.stop()
-                respond("Reproducao parada.")
-            else:
-                respond(
-                    'Nao entendi o comando. Ex.: "toque evidencias", '
-                    '"pause", "pare".'
-                )
+        thread.join()
     except KeyboardInterrupt:
         respond("Encerrando.")
     finally:
-        player.stop()
-        if beep is not None:
-            beep.close()
+        engine.stop(stop_audio=True)
+        server.should_exit = True
 
 
 if __name__ == "__main__":

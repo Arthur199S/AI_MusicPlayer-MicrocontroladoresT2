@@ -125,11 +125,35 @@ export VOSK_MODEL_PATH=models/vosk-model-small-pt-0.3
 python -m src.main
 ```
 
+Isso sobe o **dashboard** em `http://127.0.0.1:8080/` e, por padrao, o
+motor de voz (`ENGINE_AUTOSTART=1`). Defina `DASHBOARD_TOKEN` no `.env`
+(veja `.env.example`).
+
 Fluxo de fala: diga a wake word e, em seguida, o comando. Exemplos:
 
 - `assistente, toque evidencias`
-- `jarvis, pause`
+- `assistente, pause`
 - `assistente, pare`
+
+### Dashboard web + ngrok
+
+O painel mostra status, musica atual/ultima, frase reconhecida, requests,
+linhas transcritas, tokens STT, CPU/RAM/disco, e permite Pause / Continuar /
+Parar / Tocar + **Start/Stop** do motor de voz (sem derrubar o dashboard).
+
+```bash
+# no .env:
+# DASHBOARD_TOKEN=um-segredo-forte
+# DASHBOARD_PORT=8080
+
+python -m src.main
+# outro terminal:
+chmod +x scripts/run_dashboard_tunnel.sh
+./scripts/run_dashboard_tunnel.sh
+```
+
+Abra a URL `https://...ngrok...` e use `?token=SEU_DASHBOARD_TOKEN`.
+Instale o ngrok e configure: `ngrok config add-authtoken ...`.
 
 ## Testes
 
@@ -183,15 +207,20 @@ python -m scripts.test_buzzer --device 1   # forca PortAudio index 1
 
 ```text
 src/
-  main.py                 # Inicializacao e loop principal
+  main.py                 # Dashboard + entry point
+  voice_engine.py         # Loop de voz start/stop (thread)
+  app_state.py            # Estado compartilhado (metricas)
+  dashboard.py            # FastAPI + controles web
+  templates/dashboard.html
   voice_recognition.py    # Wake word (Vosk) + gravacao do clip
-  openai_transcribe.py    # Transcricao via OpenAI
+  openai_transcribe.py    # Transcricao via OpenAI (+ usage)
   command_parser.py       # Interpretacao dos comandos
   youtube_search.py       # Busca da musica
   player.py               # Controle IPC do mpv
+scripts/
+  run_dashboard_tunnel.sh # ngrok -> dashboard
 tests/
-  test_command_parser.py
-  test_openai_transcribe.py
+  ...
 .env.example
 requirements.txt
 README.md

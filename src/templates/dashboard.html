@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Music Player</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --warn: #f0b429;
+      --danger: #f07178;
+      --border: #2a3548;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1b2a44, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
+    .grid {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+    }
+    .card h2 {
+      margin: 0 0 0.45rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .value { font-size: 1.15rem; word-break: break-word; }
+    .status-pill {
+      display: inline-block;
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      background: #243247;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .status-pill.running { color: var(--ok); }
+    .status-pill.stopped { color: var(--muted); }
+    .status-pill.error { color: var(--danger); }
+    .status-pill.playing, .status-pill.paused { color: var(--accent); }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    button, .play-row button {
+      border: 0;
+      border-radius: 8px;
+      padding: 0.55rem 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2b3b55;
+      color: var(--text);
+    }
+    button.primary { background: var(--accent); color: #041018; }
+    button.danger { background: var(--danger); color: #1a0a0c; }
+    button.ok { background: var(--ok); color: #062016; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .play-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .play-row input {
+      flex: 1;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #121a26;
+      color: var(--text);
+      padding: 0.55rem 0.75rem;
+    }
+    .wide { grid-column: 1 / -1; }
+    ul.msgs {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      max-height: 140px;
+      overflow: auto;
+    }
+    .err { color: var(--danger); min-height: 1.2em; font-size: 0.9rem; }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Music Player</h1>
+    <p class="sub">Dashboard local — atualiza a cada 2s</p>
+
+    <div class="controls">
+      <button id="btnEngine" class="ok" type="button">Start</button>
+      <button id="btnPause" type="button">Pause</button>
+      <button id="btnResume" type="button">Continuar</button>
+      <button id="btnStop" class="danger" type="button">Parar musica</button>
+    </div>
+    <div class="play-row">
+      <input id="playQuery" type="text" placeholder="Ex.: Evidencias Chitaozinho" />
+      <button id="btnPlay" class="primary" type="button">Tocar</button>
+    </div>
+    <p class="err" id="error"></p>
+
+    <div class="grid" style="margin-top: 1rem;">
+      <div class="card wide">
+        <h2>Status da aplicacao</h2>
+        <div class="value"><span id="appStatus" class="status-pill stopped">—</span></div>
+      </div>
+      <div class="card">
+        <h2>Musica tocando</h2>
+        <div class="value" id="currentTrack">—</div>
+      </div>
+      <div class="card">
+        <h2>Ultima musica</h2>
+        <div class="value" id="lastTrack">—</div>
+      </div>
+      <div class="card wide">
+        <h2>Frase reconhecida</h2>
+        <div class="value" id="recognizedPhrase">—</div>
+      </div>
+      <div class="card">
+        <h2>Requests</h2>
+        <div class="value" id="requestCount">0</div>
+      </div>
+      <div class="card">
+        <h2>Linhas transcritas</h2>
+        <div class="value" id="transcribedLines">0</div>
+      </div>
+      <div class="card">
+        <h2>Chars STT</h2>
+        <div class="value" id="transcribedChars">0</div>
+      </div>
+      <div class="card">
+        <h2>Tokens in / out / total</h2>
+        <div class="value" id="tokens">0 / 0 / 0</div>
+      </div>
+      <div class="card">
+        <h2>STT calls / audio (s)</h2>
+        <div class="value" id="sttMeta">0 / 0</div>
+      </div>
+      <div class="card">
+        <h2>CPU</h2>
+        <div class="value" id="cpu">—</div>
+      </div>
+      <div class="card">
+        <h2>RAM</h2>
+        <div class="value" id="ram">—</div>
+      </div>
+      <div class="card">
+        <h2>Disco /</h2>
+        <div class="value" id="disk">—</div>
+      </div>
+      <div class="card">
+        <h2>Temp</h2>
+        <div class="value" id="temp">—</div>
+      </div>
+      <div class="card wide">
+        <h2>Mensagens recentes</h2>
+        <ul class="msgs" id="messages"></ul>
+      </div>
+    </div>
+    <p class="hint">request_count = STT OpenAI + plays via web. Start/Stop controla o motor de voz (dashboard e ngrok ficam no ar).</p>
+  </main>
+  <script>
+    const TOKEN = "__DASHBOARD_TOKEN__";
+    const qs = TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : "";
+    const headers = TOKEN
+      ? { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json" }
+      : { "Content-Type": "application/json" };
+
+    const $ = (id) => document.getElementById(id);
+    const errEl = $("error");
+
+    function statusClass(status, running) {
+      if (status === "error") return "error";
+      if (!running || status === "stopped") return "stopped";
+      if (status === "playing" || status === "paused") return status;
+      return "running";
+    }
+
+    async function api(path, opts = {}) {
+      errEl.textContent = "";
+      const res = await fetch(path + qs, {
+        ...opts,
+        headers: { ...headers, ...(opts.headers || {}) },
+      });
+      if (!res.ok) {
+        let detail = res.statusText;
+        try {
+          const body = await res.json();
+          detail = body.detail || JSON.stringify(body);
+        } catch (_) {}
+        throw new Error(detail);
+      }
+      if (res.status === 204) return null;
+      return res.json();
+    }
+
+    function render(data) {
+      const status = data.app_status || "—";
+      const pill = $("appStatus");
+      pill.textContent = status + (data.engine_running ? " (engine on)" : " (engine off)");
+      pill.className = "status-pill " + statusClass(status, data.engine_running);
+
+      $("currentTrack").textContent = data.current_track || "—";
+      $("lastTrack").textContent = data.last_track || "—";
+      $("recognizedPhrase").textContent = data.recognized_phrase || "—";
+      $("requestCount").textContent = String(data.request_count ?? 0);
+      $("transcribedLines").textContent = String(data.transcribed_lines ?? 0);
+      $("transcribedChars").textContent = String(data.transcribed_chars ?? 0);
+      $("tokens").textContent =
+        `${data.input_tokens ?? 0} / ${data.output_tokens ?? 0} / ${data.total_tokens ?? 0}`;
+      $("sttMeta").textContent =
+        `${data.stt_calls ?? 0} / ${data.audio_seconds_est ?? 0}`;
+
+      const sys = data.system || {};
+      $("cpu").textContent = sys.cpu_percent != null ? `${sys.cpu_percent}%` : "—";
+      $("ram").textContent = sys.ram_used_mb != null
+        ? `${sys.ram_used_mb} / ${sys.ram_total_mb} MB (${sys.ram_percent}%)`
+        : "—";
+      $("disk").textContent = sys.disk_used_gb != null
+        ? `${sys.disk_used_gb} / ${sys.disk_total_gb} GB (${sys.disk_percent}%)`
+        : "—";
+      $("temp").textContent = sys.temp_c != null ? `${sys.temp_c} °C` : "—";
+
+      const ul = $("messages");
+      ul.innerHTML = "";
+      (data.recent_messages || []).slice(0, 12).forEach((msg) => {
+        const li = document.createElement("li");
+        li.textContent = msg;
+        ul.appendChild(li);
+      });
+
+      const btn = $("btnEngine");
+      if (data.engine_running) {
+        btn.textContent = "Stop";
+        btn.className = "danger";
+      } else {
+        btn.textContent = "Start";
+        btn.className = "ok";
+      }
+    }
+
+    async function refresh() {
+      try {
+        const data = await api("/api/status");
+        render(data);
+      } catch (e) {
+        errEl.textContent = String(e.message || e);
+      }
+    }
+
+    $("btnEngine").onclick = async () => {
+      try {
+        const data = await api("/api/status");
+        if (data.engine_running) await api("/api/engine/stop", { method: "POST" });
+        else await api("/api/engine/start", { method: "POST" });
+        await refresh();
+      } catch (e) {
+        errEl.textContent = String(e.message || e);
+      }
+    };
+    $("btnPause").onclick = () => api("/api/pause", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
+    $("btnResume").onclick = () => api("/api/resume", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
+    $("btnStop").onclick = () => api("/api/stop", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
+    $("btnPlay").onclick = async () => {
+      const query = $("playQuery").value.trim();
+      if (!query) { errEl.textContent = "Digite o nome da musica."; return; }
+      try {
+        await api("/api/play", { method: "POST", body: JSON.stringify({ query }) });
+        await refresh();
+      } catch (e) {
+        errEl.textContent = String(e.message || e);
+      }
+    };
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

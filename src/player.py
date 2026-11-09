@@ -12,12 +12,16 @@ class PlayerError(RuntimeError):
 
 
 def _default_audio_device() -> str:
-    """Device ALSA onde o som realmente sai neste Pi.
+    """Device ALSA do jack P2 (bcm2835 Headphones).
 
-    O teste que funcionou foi ``plughw:3,0`` (bcm2835 Headphones / jack).
-    Pode sobrescrever com ``MPV_AUDIO_DEVICE`` no .env.
+    Usa o nome da placa (``CARD=Headphones``), nao o indice numerico —
+    o Voice HAT pode deslocar ``hw:N,0`` apos reboot. Sobrescreva com
+    ``MPV_AUDIO_DEVICE`` no ``.env`` se precisar.
     """
-    return os.environ.get("MPV_AUDIO_DEVICE", "alsa/plughw:3,0").strip()
+    return os.environ.get(
+        "MPV_AUDIO_DEVICE",
+        "alsa/plughw:CARD=Headphones,DEV=0",
+    ).strip()
 
 
 class Player:
