@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ubidots ao vivo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .meta { color: #999; font-size: 13px; margin-bottom: 12px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #888; margin-right: 6px; }
+    .dot.ok { background: #3c6; } .dot.bad { background: #e44; }
+    table { border-collapse: collapse; width: 100%; max-width: 900px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    th { color: #999; font-weight: 600; }
+    td.var { font-family: monospace; color: #9cf; }
+    td.val { font-family: monospace; }
+    .flash { animation: flash 1.2s ease-out; }
+    @keyframes flash { from { background: #b8860b; } to { background: transparent; } }
+    .diff { color: #f96; }
+    .err { color: #f66; margin: 8px 0; font-size: 13px; }
+    .small { color: #888; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Ubidots ao vivo <span id="device"></span></h1>
+  <div class="meta">
+    <span class="dot" id="mqttDot"></span><span id="mqttText">...</span>
+    &middot; atualiza a cada 2s &middot; <span id="clock"></span>
+  </div>
+  <div class="err" id="err"></div>
+  <table>
+    <thead>
+      <tr><th>Variavel</th><th>Pi esta enviando</th><th>Ubidots recebeu</th><th>Ultimo update</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="small">Laranja = o valor no Ubidots ainda e diferente do que o Pi envia agora (normal ate o proximo publish, ~15s).</p>
+
+  <script>
+    const TOKEN = "__DASHBOARD_TOKEN__";
+    const qs = TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : "";
+    const ORDER = [
+      "now_playing", "app_status", "tracks_today", "seconds_left",
+      "cpu_percent", "temp_c", "ram_percent", "engine_running", "heartbeat",
+      "stt_latency_ms", "e2e_latency_ms", "cmd_pause", "cmd_resume",
+    ];
+    const previous = {};
+
+    function fmt(item) {
+      if (item === undefined || item === null) return "-";
+      if (typeof item === "object" && "value" in item) {
+        const ctx = item.context && (item.context.track ?? item.context.text);
+        return ctx !== undefined ? `${item.value}  "${ctx}"` : String(item.value);
+      }
+      return String(item);
+    }
+
+    function ago(ts) {
+      if (!ts) return "-";
+      const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+      return s < 60 ? `${s}s atras` : `${Math.round(s / 60)}min atras`;
+    }
+
+    function setCell(td, key, text) {
+      if (previous[key] !== undefined && previous[key] !== text) {
+        td.classList.remove("flash"); void td.offsetWidth; td.classList.add("flash");
+      }
+      previous[key] = text;
+      td.textContent = text;
+    }
+
+    function row(name) {
+      let tr = document.getElementById("r-" + name);
+      if (!tr) {
+        tr = document.createElement("tr");
+        tr.id = "r-" + name;
+        tr.innerHTML = `<td class="var">${name}</td><td class="val sent"></td><td class="val remote"></td><td class="val ts"></td>`;
+        document.getElementById("rows").appendChild(tr);
+      }
+      return tr;
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/ubidots" + qs, { cache: "no-store" });
+        const data = await res.json();
+        document.getElementById("device").textContent = data.device ? `(${data.device})` : "";
+        const dot = document.getElementById("mqttDot");
+        dot.className = "dot " + (data.connected ? "ok" : "bad");
+        document.getElementById("mqttText").textContent = data.connected ? "MQTT conectado" : "MQTT desconectado";
+        document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+
+        const remote = (data.remote && data.remote.variables) || {};
+        document.getElementById("err").textContent =
+          data.remote && data.remote.error ? "Erro ao ler Ubidots: " + data.remote.error : "";
+
+        const names = [...ORDER, ...Object.keys(remote).filter(k => !ORDER.includes(k)).sort()];
+        for (const name of names) {
+          const tr = row(name);
+          const sentText = fmt(data.sent[name]);
+          const rem = remote[name];
+          const remText = fmt(rem);
+          const sentCell = tr.querySelector(".sent");
+          const remCell = tr.querySelector(".remote");
+          setCell(sentCell, name + ":s", sentText);
+          setCell(remCell, name + ":r", remText);
+          const comparable = data.sent[name] !== undefined && rem !== undefined;
+          remCell.classList.toggle("diff", comparable && sentText !== remText);
+          tr.querySelector(".ts").textContent = rem ? ago(rem.timestamp) : "-";
+        }
+      } catch (e) {
+        document.getElementById("err").textContent = "Falha ao consultar o Pi: " + e;
+      }
+    }
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

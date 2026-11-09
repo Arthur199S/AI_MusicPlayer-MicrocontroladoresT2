@@ -3,188 +3,289 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Music Player</title>
+  <title>AI Music Player — Demo local</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --text: #e7ecf3;
-      --muted: #8b9bb4;
+      --bg: #e8ecf1;
+      --card: #ffffff;
+      --text: #1a2332;
+      --muted: #6b7a90;
+      --border: #d5dde8;
       --accent: #3d9cf0;
-      --ok: #3ecf8e;
-      --warn: #f0b429;
-      --danger: #f07178;
-      --border: #2a3548;
+      --ok: #2db67a;
+      --warn: #e0a100;
+      --danger: #e25563;
+      --track: #0f1724;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 10% -10%, #1b2a44, var(--bg));
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
     }
-    main {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 1.5rem 1rem 3rem;
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
-    h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
-    .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
+    header h1 { margin: 0; font-size: 1.15rem; }
+    header .meta { color: var(--muted); font-size: 0.85rem; }
+    .dot {
+      display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+      background: #aaa; margin-right: 6px; vertical-align: middle;
+    }
+    .dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(45,182,122,.2); }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1.1rem 1rem 2.5rem;
+    }
     .grid {
       display: grid;
-      gap: 0.85rem;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.9rem;
+      grid-template-columns: repeat(12, 1fr);
     }
     .card {
-      background: var(--panel);
+      background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 0.9rem 1rem;
+      border-radius: 10px;
+      padding: 0.95rem 1.05rem;
+      box-shadow: 0 1px 2px rgba(16,24,40,.04);
+      min-height: 110px;
     }
     .card h2 {
-      margin: 0 0 0.45rem;
-      font-size: 0.75rem;
+      margin: 0 0 0.55rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: .04em;
       color: var(--muted);
-      font-weight: 600;
+      font-weight: 700;
     }
-    .value { font-size: 1.15rem; word-break: break-word; }
-    .status-pill {
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    @media (max-width: 860px) {
+      .span-3, .span-4, .span-6, .span-8 { grid-column: span 12; }
+    }
+    .big {
+      font-size: 1.85rem;
+      font-weight: 700;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .track {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--track);
+      min-height: 2.4em;
+    }
+    .pill {
       display: inline-block;
-      padding: 0.2rem 0.65rem;
+      padding: .25rem .7rem;
       border-radius: 999px;
-      background: #243247;
-      font-size: 0.95rem;
-      font-weight: 600;
+      background: #eef3f9;
+      font-weight: 700;
+      font-size: .95rem;
     }
-    .status-pill.running { color: var(--ok); }
-    .status-pill.stopped { color: var(--muted); }
-    .status-pill.error { color: var(--danger); }
-    .status-pill.playing, .status-pill.paused { color: var(--accent); }
+    .pill.playing { color: var(--ok); background: #e7f8ef; }
+    .pill.paused { color: var(--warn); background: #fff6df; }
+    .pill.error { color: var(--danger); background: #fdecee; }
+    .pill.idle { color: var(--muted); }
+
+    .gauge-wrap { display: flex; align-items: flex-end; gap: .75rem; }
+    .gauge {
+      flex: 1; height: 14px; background: #edf1f6; border-radius: 999px; overflow: hidden;
+    }
+    .gauge > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), #6bc4ff);
+      transition: width .4s ease;
+    }
+    .gauge.temp > i { background: linear-gradient(90deg, #3ecf8e, #f0b429, #e25563); }
+    .gauge-val { font-weight: 700; min-width: 4.2rem; text-align: right; }
+
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      margin-top: .35rem;
+    }
+    .switch {
+      position: relative; width: 56px; height: 30px; border-radius: 999px;
+      background: #c5cedb; border: 0; cursor: pointer; transition: background .2s;
+      flex-shrink: 0;
+    }
+    .switch::after {
+      content: ""; position: absolute; top: 3px; left: 3px;
+      width: 24px; height: 24px; border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .2s;
+    }
+    .switch.on { background: var(--accent); }
+    .switch.on::after { left: 29px; }
+    .switch:disabled { opacity: .5; cursor: wait; }
+
     .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin: 1rem 0;
+      display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem;
     }
-    button, .play-row button {
-      border: 0;
-      border-radius: 8px;
-      padding: 0.55rem 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      background: #2b3b55;
-      color: var(--text);
+    button.btn {
+      border: 0; border-radius: 8px; padding: .55rem .9rem;
+      font-weight: 700; cursor: pointer; background: #e8eef6; color: var(--text);
     }
-    button.primary { background: var(--accent); color: #041018; }
-    button.danger { background: var(--danger); color: #1a0a0c; }
-    button.ok { background: var(--ok); color: #062016; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .play-row {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
+    button.btn.primary { background: var(--accent); color: #fff; }
+    button.btn.danger { background: var(--danger); color: #fff; }
+    button.btn.ok { background: var(--ok); color: #fff; }
+    .play-row { display: flex; gap: .5rem; margin-top: .65rem; }
     .play-row input {
-      flex: 1;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #121a26;
-      color: var(--text);
-      padding: 0.55rem 0.75rem;
+      flex: 1; border-radius: 8px; border: 1px solid var(--border);
+      padding: .55rem .75rem; font-size: .95rem;
     }
-    .wide { grid-column: 1 / -1; }
-    ul.msgs {
+    .err { color: var(--danger); min-height: 1.2em; font-size: .9rem; margin: .5rem 0 0; }
+    .hint { color: var(--muted); font-size: .8rem; margin-top: 1rem; }
+    .latency { font-size: 1.4rem; font-weight: 700; }
+    .latency small { display: block; color: var(--muted); font-size: .75rem; font-weight: 600; margin-top: .2rem; }
+    .flash { animation: flash .9s ease-out; }
+    @keyframes flash { from { background: #fff3c4; } to { background: var(--card); } }
+    ol.history {
       margin: 0;
-      padding-left: 1.1rem;
-      color: var(--muted);
-      font-size: 0.85rem;
-      max-height: 140px;
-      overflow: auto;
+      padding-left: 1.35rem;
+      list-style: decimal;
     }
-    .err { color: var(--danger); min-height: 1.2em; font-size: 0.9rem; }
-    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.75rem; }
+    ol.history li {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #eef2f7;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    ol.history li:last-child { border-bottom: 0; }
+    ol.history li.current::after {
+      content: " agora";
+      color: var(--ok);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-left: 0.4rem;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <div>
+      <h1>AI Music Player — demo local</h1>
+      <div class="meta">Mesmas metricas do Ubidots, sem cota / MQTT</div>
+    </div>
+    <div class="meta">
+      <span class="dot" id="liveDot"></span>
+      <span id="liveText">conectando…</span>
+      · atualiza 2s · <span id="clock"></span>
+    </div>
+  </header>
+
   <main>
-    <h1>AI Music Player</h1>
-    <p class="sub">Dashboard local — atualiza a cada 2s</p>
-
-    <div class="controls">
-      <button id="btnEngine" class="ok" type="button">Start</button>
-      <button id="btnPause" type="button">Pause</button>
-      <button id="btnResume" type="button">Continuar</button>
-      <button id="btnStop" class="danger" type="button">Parar musica</button>
-    </div>
-    <div class="play-row">
-      <input id="playQuery" type="text" placeholder="Ex.: Evidencias Chitaozinho" />
-      <button id="btnPlay" class="primary" type="button">Tocar</button>
-    </div>
-    <p class="err" id="error"></p>
-
-    <div class="grid" style="margin-top: 1rem;">
-      <div class="card wide">
-        <h2>Status da aplicacao</h2>
-        <div class="value"><span id="appStatus" class="status-pill stopped">—</span></div>
+    <div class="grid">
+      <div class="card span-3" id="cardStatus">
+        <h2>Device / status</h2>
+        <div><span class="pill idle" id="appStatus">—</span></div>
+        <div class="meta" style="margin-top:.55rem" id="engineLabel">engine —</div>
       </div>
-      <div class="card">
+
+      <div class="card span-3" id="cardTemp">
+        <h2>Temperatura</h2>
+        <div class="gauge-wrap">
+          <div class="gauge temp"><i id="tempBar"></i></div>
+          <div class="gauge-val" id="temp">—</div>
+        </div>
+      </div>
+
+      <div class="card span-3" id="cardCpu">
+        <h2>Uso de CPU</h2>
+        <div class="gauge-wrap">
+          <div class="gauge"><i id="cpuBar"></i></div>
+          <div class="gauge-val" id="cpu">—</div>
+        </div>
+      </div>
+
+      <div class="card span-3" id="cardRam">
+        <h2>Uso de RAM</h2>
+        <div class="gauge-wrap">
+          <div class="gauge"><i id="ramBar"></i></div>
+          <div class="gauge-val" id="ram">—</div>
+        </div>
+      </div>
+
+      <div class="card span-4" id="cardTracks">
+        <h2>Quantas musicas tocou hoje</h2>
+        <div class="big" id="tracksToday">0</div>
+      </div>
+
+      <div class="card span-8" id="cardNow">
         <h2>Musica tocando</h2>
-        <div class="value" id="currentTrack">—</div>
+        <div class="track" id="nowPlaying">nada tocando</div>
+        <div class="meta" style="margin-top:.45rem">
+          Restam <strong id="secondsLeft">—</strong>
+          · ultima: <span id="lastTrack">—</span>
+        </div>
       </div>
-      <div class="card">
-        <h2>Ultima musica</h2>
-        <div class="value" id="lastTrack">—</div>
+
+      <div class="card span-4" id="cardPause">
+        <h2>Pause (switch)</h2>
+        <div class="switch-row">
+          <div>
+            <div id="pauseLabel" style="font-weight:700">Tocando</div>
+            <div class="meta" style="font-size:.8rem">1 = pausado · 0 = tocando</div>
+          </div>
+          <button class="switch" id="btnPauseSwitch" type="button" title="Pause / Continuar" aria-label="Pause"></button>
+        </div>
       </div>
-      <div class="card wide">
-        <h2>Frase reconhecida</h2>
-        <div class="value" id="recognizedPhrase">—</div>
+
+      <div class="card span-4" id="cardStt">
+        <h2>Latencia STT</h2>
+        <div class="latency" id="sttLatency">— <small>ms (ultima chamada OpenAI)</small></div>
       </div>
-      <div class="card">
-        <h2>Requests</h2>
-        <div class="value" id="requestCount">0</div>
+
+      <div class="card span-4" id="cardE2e">
+        <h2>Latencia ponta a ponta</h2>
+        <div class="latency" id="e2eLatency">— <small>ms (wake → acao)</small></div>
       </div>
-      <div class="card">
-        <h2>Linhas transcritas</h2>
-        <div class="value" id="transcribedLines">0</div>
+
+      <div class="card span-12" id="cardHistory">
+        <h2>Historico — ultimas 5 musicas</h2>
+        <ol id="trackHistory" class="history"></ol>
+        <div class="meta" id="historyEmpty" style="display:none">Nenhuma musica ainda.</div>
       </div>
-      <div class="card">
-        <h2>Chars STT</h2>
-        <div class="value" id="transcribedChars">0</div>
+
+      <div class="card span-12">
+        <h2>Controles extras</h2>
+        <div class="controls">
+          <button class="btn ok" id="btnEngine" type="button">Start motor</button>
+          <button class="btn danger" id="btnStop" type="button">Parar musica</button>
+        </div>
+        <div class="play-row">
+          <input id="playQuery" type="text" placeholder="Ex.: Evidencias Chitaozinho" />
+          <button class="btn primary" id="btnPlay" type="button">Tocar</button>
+        </div>
+        <p class="err" id="error"></p>
       </div>
-      <div class="card">
-        <h2>Tokens in / out / total</h2>
-        <div class="value" id="tokens">0 / 0 / 0</div>
-      </div>
-      <div class="card">
-        <h2>STT calls / audio (s)</h2>
-        <div class="value" id="sttMeta">0 / 0</div>
-      </div>
-      <div class="card">
-        <h2>CPU</h2>
-        <div class="value" id="cpu">—</div>
-      </div>
-      <div class="card">
-        <h2>RAM</h2>
-        <div class="value" id="ram">—</div>
-      </div>
-      <div class="card">
-        <h2>Disco /</h2>
-        <div class="value" id="disk">—</div>
-      </div>
-      <div class="card">
-        <h2>Temp</h2>
-        <div class="value" id="temp">—</div>
-      </div>
-      <div class="card wide">
-        <h2>Mensagens recentes</h2>
-        <ul class="msgs" id="messages"></ul>
+
+      <div class="card span-12">
+        <h2>Frase reconhecida / log</h2>
+        <div id="recognized" style="font-weight:600;margin-bottom:.5rem">—</div>
+        <ul id="messages" style="margin:0;padding-left:1.1rem;color:var(--muted);font-size:.85rem;max-height:120px;overflow:auto"></ul>
       </div>
     </div>
-    <p class="hint">request_count = STT OpenAI + plays via web. Start/Stop controla o motor de voz (dashboard e ngrok ficam no ar).</p>
+    <p class="hint">
+      Demo local das mesmas funcionalidades do Ubidots STEM (now playing, contador do dia,
+      gauges, latencia, botao pause). Sem MQTT e sem limite de dots.
+      Debug Ubidots (opcional): <a href="/live">/live</a>
+    </p>
   </main>
+
   <script>
     const TOKEN = "__DASHBOARD_TOKEN__";
     const qs = TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : "";
@@ -194,12 +295,25 @@
 
     const $ = (id) => document.getElementById(id);
     const errEl = $("error");
+    let busy = false;
+    let lastPaused = null;
 
-    function statusClass(status, running) {
-      if (status === "error") return "error";
-      if (!running || status === "stopped") return "stopped";
-      if (status === "playing" || status === "paused") return status;
-      return "running";
+    const STATUS_LABEL = {
+      stopped: "parado",
+      starting: "iniciando",
+      listening_wake: "ouvindo",
+      recording: "gravando",
+      transcribing: "transcrevendo",
+      playing: "tocando",
+      paused: "pausado",
+      error: "erro",
+    };
+
+    function flash(id) {
+      const el = $(id);
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
     }
 
     async function api(path, opts = {}) {
@@ -220,36 +334,89 @@
       return res.json();
     }
 
-    function render(data) {
-      const status = data.app_status || "—";
-      const pill = $("appStatus");
-      pill.textContent = status + (data.engine_running ? " (engine on)" : " (engine off)");
-      pill.className = "status-pill " + statusClass(status, data.engine_running);
+    function setBar(barId, valueId, value, unit, max) {
+      const v = value == null ? null : Number(value);
+      $(valueId).textContent = v == null ? "—" : `${v.toFixed(1)}${unit}`;
+      const pct = v == null ? 0 : Math.max(0, Math.min(100, (v / max) * 100));
+      $(barId).style.width = pct + "%";
+    }
 
-      $("currentTrack").textContent = data.current_track || "—";
+    function fmtSeconds(sec) {
+      if (sec == null || sec === "" || Number(sec) <= 0) return "—";
+      const s = Math.round(Number(sec));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return m > 0 ? `${m}m ${r}s` : `${r}s`;
+    }
+
+    function render(data) {
+      const status = data.app_status || "stopped";
+      const pill = $("appStatus");
+      pill.textContent = STATUS_LABEL[status] || status;
+      pill.className = "pill " + (
+        status === "playing" ? "playing" :
+        status === "paused" ? "paused" :
+        status === "error" ? "error" : "idle"
+      );
+      $("engineLabel").textContent = data.engine_running ? "motor de voz ligado" : "motor de voz parado";
+
+      const track = (data.current_track || "").trim();
+      const nowText = track || "nada tocando";
+      if ($("nowPlaying").textContent !== nowText) {
+        $("nowPlaying").textContent = nowText;
+        flash("cardNow");
+      }
       $("lastTrack").textContent = data.last_track || "—";
-      $("recognizedPhrase").textContent = data.recognized_phrase || "—";
-      $("requestCount").textContent = String(data.request_count ?? 0);
-      $("transcribedLines").textContent = String(data.transcribed_lines ?? 0);
-      $("transcribedChars").textContent = String(data.transcribed_chars ?? 0);
-      $("tokens").textContent =
-        `${data.input_tokens ?? 0} / ${data.output_tokens ?? 0} / ${data.total_tokens ?? 0}`;
-      $("sttMeta").textContent =
-        `${data.stt_calls ?? 0} / ${data.audio_seconds_est ?? 0}`;
+
+      const tracks = String(data.tracks_today ?? 0);
+      if ($("tracksToday").textContent !== tracks) {
+        $("tracksToday").textContent = tracks;
+        flash("cardTracks");
+      }
+
+      const pb = data.playback || {};
+      $("secondsLeft").textContent = fmtSeconds(pb.seconds_left);
+
+      const paused = status === "paused" || pb.paused === true;
+      if (paused !== lastPaused) {
+        lastPaused = paused;
+        $("btnPauseSwitch").classList.toggle("on", paused);
+        $("pauseLabel").textContent = paused ? "Pausado" : (track ? "Tocando" : "Parado");
+        flash("cardPause");
+      }
+
+      const stt = data.last_stt_latency_ms;
+      $("sttLatency").innerHTML = (stt != null ? `${Number(stt).toFixed(0)}` : "—")
+        + " <small>ms (ultima chamada OpenAI)</small>";
+      const e2e = data.last_e2e_latency_ms;
+      $("e2eLatency").innerHTML = (e2e != null ? `${Number(e2e).toFixed(0)}` : "—")
+        + " <small>ms (wake → acao)</small>";
 
       const sys = data.system || {};
-      $("cpu").textContent = sys.cpu_percent != null ? `${sys.cpu_percent}%` : "—";
-      $("ram").textContent = sys.ram_used_mb != null
-        ? `${sys.ram_used_mb} / ${sys.ram_total_mb} MB (${sys.ram_percent}%)`
-        : "—";
-      $("disk").textContent = sys.disk_used_gb != null
-        ? `${sys.disk_used_gb} / ${sys.disk_total_gb} GB (${sys.disk_percent}%)`
-        : "—";
-      $("temp").textContent = sys.temp_c != null ? `${sys.temp_c} °C` : "—";
+      setBar("tempBar", "temp", sys.temp_c, " °C", 85);
+      setBar("cpuBar", "cpu", sys.cpu_percent, "%", 100);
+      setBar("ramBar", "ram", sys.ram_percent, "%", 100);
 
+      const history = Array.isArray(data.recent_tracks) ? data.recent_tracks : [];
+      const ol = $("trackHistory");
+      const empty = $("historyEmpty");
+      ol.innerHTML = "";
+      if (!history.length) {
+        empty.style.display = "block";
+      } else {
+        empty.style.display = "none";
+        history.forEach((title, idx) => {
+          const li = document.createElement("li");
+          li.textContent = title;
+          if (idx === 0 && track && title === track) li.className = "current";
+          ol.appendChild(li);
+        });
+      }
+
+      $("recognized").textContent = data.recognized_phrase || "—";
       const ul = $("messages");
       ul.innerHTML = "";
-      (data.recent_messages || []).slice(0, 12).forEach((msg) => {
+      (data.recent_messages || []).slice(0, 10).forEach((msg) => {
         const li = document.createElement("li");
         li.textContent = msg;
         ul.appendChild(li);
@@ -257,12 +424,16 @@
 
       const btn = $("btnEngine");
       if (data.engine_running) {
-        btn.textContent = "Stop";
-        btn.className = "danger";
+        btn.textContent = "Stop motor";
+        btn.className = "btn danger";
       } else {
-        btn.textContent = "Start";
-        btn.className = "ok";
+        btn.textContent = "Start motor";
+        btn.className = "btn ok";
       }
+
+      $("liveDot").className = "dot on";
+      $("liveText").textContent = "ao vivo";
+      $("clock").textContent = new Date().toLocaleTimeString();
     }
 
     async function refresh() {
@@ -270,9 +441,27 @@
         const data = await api("/api/status");
         render(data);
       } catch (e) {
+        $("liveDot").className = "dot";
+        $("liveText").textContent = "offline";
         errEl.textContent = String(e.message || e);
       }
     }
+
+    $("btnPauseSwitch").onclick = async () => {
+      if (busy) return;
+      busy = true;
+      $("btnPauseSwitch").disabled = true;
+      try {
+        if (lastPaused) await api("/api/resume", { method: "POST" });
+        else await api("/api/pause", { method: "POST" });
+        await refresh();
+      } catch (e) {
+        errEl.textContent = String(e.message || e);
+      } finally {
+        busy = false;
+        $("btnPauseSwitch").disabled = false;
+      }
+    };
 
     $("btnEngine").onclick = async () => {
       try {
@@ -284,9 +473,10 @@
         errEl.textContent = String(e.message || e);
       }
     };
-    $("btnPause").onclick = () => api("/api/pause", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
-    $("btnResume").onclick = () => api("/api/resume", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
-    $("btnStop").onclick = () => api("/api/stop", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
+
+    $("btnStop").onclick = () =>
+      api("/api/stop", { method: "POST" }).then(refresh).catch((e) => errEl.textContent = e.message);
+
     $("btnPlay").onclick = async () => {
       const query = $("playQuery").value.trim();
       if (!query) { errEl.textContent = "Digite o nome da musica."; return; }

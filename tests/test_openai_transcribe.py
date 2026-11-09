@@ -50,6 +50,8 @@ class OpenAITranscribeTests(unittest.TestCase):
         self.assertEqual(result.input_tokens, 120)
         self.assertEqual(result.output_tokens, 8)
         self.assertEqual(result.total_tokens, 128)
+        self.assertIsNotNone(result.latency_ms)
+        self.assertGreaterEqual(result.latency_ms, 0)
         openai_cls.assert_called_once_with(api_key="sk-test")
         kwargs = fake_client.audio.transcriptions.create.call_args.kwargs
         self.assertEqual(kwargs["model"], "gpt-4o-mini-transcribe")

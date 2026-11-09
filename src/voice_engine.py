@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from typing import Callable
 
 from .app_state import AppState
@@ -12,7 +13,7 @@ from .openai_transcribe import TranscriptionError, transcribe_audio
 from .player import Player, PlayerError
 from .speaker_beep import SpeakerBeep, SpeakerBeepError
 from .voice_recognition import VoiceRecognitionError, VoiceRecognizer
-from .youtube_search import YouTubeSearchError, find_audio_url
+from .youtube_search import YouTubeSearchError, find_audio
 
 
 RespondFn = Callable[[str], None]
@@ -117,7 +118,7 @@ class VoiceEngine:
 
         try:
             while not self._stop.is_set():
-                self.state.set_status("listening_wake")
+                self.state.set_listening_wake()
                 self._respond("Aguardando wake word...")
                 wake_text = recognizer.listen_for_wake(
                     timeout=2.0,
@@ -129,6 +130,7 @@ class VoiceEngine:
                     continue
 
                 self.state.set_wake(wake_text)
+                wake_started = time.monotonic()
                 if beep is not None:
                     try:
                         beep.beep(count=1)
@@ -159,6 +161,7 @@ class VoiceEngine:
                     output_tokens=result.output_tokens,
                     total_tokens=result.total_tokens,
                     audio_seconds=result.audio_seconds,
+                    latency_ms=result.latency_ms,
                 )
 
                 if not result.text:
@@ -171,6 +174,9 @@ class VoiceEngine:
                 action = command["action"]
                 self.state.set_action(action)
                 self._handle_action(action, command)
+                self.state.set_e2e_latency_ms(
+                    (time.monotonic() - wake_started) * 1000.0
+                )
         finally:
             if beep is not None:
                 beep.close()
@@ -186,16 +192,17 @@ class VoiceEngine:
             query = command["query"]
             self._respond(f"Buscando: {query}")
             try:
-                self.player.play(find_audio_url(query))
-                self.state.set_playing(query)
-                self._respond("Reproducao iniciada.")
-                self.state.log(f"Tocando: {query}")
+                audio = find_audio(query)
+                self.player.play(audio.url)
+                self.state.set_playing(audio.title)
+                self._respond(f"Reproducao iniciada: {audio.title}")
+                self.state.log(f"Tocando: {audio.title} (busca: {query})")
             except (PlayerError, YouTubeSearchError) as error:
                 self._respond(str(error))
                 self.state.log(str(error))
             return
         if action == "pausar":
-            self.player.pause()
+            self.player.set_pause(True)
             self.state.clear_current_track(paused=True)
             self._respond("Reproducao pausada.")
             return

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from .app_state import AppState
 from .dashboard import create_app
 from .player import Player
+from .ubidots_mqtt import UbidotsMqttBridge
 from .voice_engine import VoiceEngine
 
 
@@ -40,7 +41,8 @@ def run() -> None:
     player = Player()
     state.audio_device = player.audio_device
     engine = VoiceEngine(state, player, respond=respond)
-    app = create_app(state, player, engine)
+    ubidots = UbidotsMqttBridge(state, player, engine=engine, respond=respond)
+    app = create_app(state, player, engine, bridge=ubidots)
 
     try:
         import uvicorn
@@ -81,11 +83,14 @@ def run() -> None:
     else:
         respond("Motor de voz parado. Use Start no dashboard ou ENGINE_AUTOSTART=1.")
 
+    ubidots.start()
+
     try:
         thread.join()
     except KeyboardInterrupt:
         respond("Encerrando.")
     finally:
+        ubidots.stop()
         engine.stop(stop_audio=True)
         server.should_exit = True
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import time
 import wave
 from dataclasses import dataclass
 from typing import BinaryIO
@@ -30,6 +31,7 @@ class TranscriptionResult:
     output_tokens: int | None = None
     total_tokens: int | None = None
     audio_seconds: float | None = None
+    latency_ms: float | None = None
 
 
 def estimate_wav_seconds(audio: bytes | BinaryIO) -> float | None:
@@ -151,10 +153,12 @@ def transcribe_audio(
         create_kwargs["language"] = resolved_language
 
     client = OpenAI(api_key=key)
+    started = time.monotonic()
     try:
         result = client.audio.transcriptions.create(**create_kwargs)
     except Exception as error:  # noqa: BLE001 — superficie unica para o main
         raise TranscriptionError(f"falha na transcricao OpenAI: {error}") from error
+    latency_ms = round((time.monotonic() - started) * 1000.0, 1)
 
     text = str(getattr(result, "text", None) or "").strip()
     input_tokens, output_tokens, total_tokens = _extract_usage(result)
@@ -164,4 +168,5 @@ def transcribe_audio(
         output_tokens=output_tokens,
         total_tokens=total_tokens,
         audio_seconds=audio_seconds,
+        latency_ms=latency_ms,
     )

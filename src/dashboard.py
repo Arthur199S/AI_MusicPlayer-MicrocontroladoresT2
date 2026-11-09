@@ -12,53 +12,23 @@ from pydantic import BaseModel, Field
 
 from .app_state import AppState
 from .player import Player, PlayerError
+from .system_metrics import system_metrics
 from .voice_engine import VoiceEngine
-from .youtube_search import YouTubeSearchError, find_audio_url
+from .youtube_search import YouTubeSearchError, find_audio
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-
-
-def _system_metrics() -> dict[str, Any]:
-    metrics: dict[str, Any] = {
-        "cpu_percent": None,
-        "ram_used_mb": None,
-        "ram_total_mb": None,
-        "ram_percent": None,
-        "disk_used_gb": None,
-        "disk_total_gb": None,
-        "disk_percent": None,
-        "temp_c": None,
-    }
-    try:
-        import psutil
-    except ImportError:
-        return metrics
-
-    metrics["cpu_percent"] = psutil.cpu_percent(interval=0.1)
-    mem = psutil.virtual_memory()
-    metrics["ram_used_mb"] = round(mem.used / (1024 ** 2), 1)
-    metrics["ram_total_mb"] = round(mem.total / (1024 ** 2), 1)
-    metrics["ram_percent"] = mem.percent
-    disk = psutil.disk_usage("/")
-    metrics["disk_used_gb"] = round(disk.used / (1024 ** 3), 2)
-    metrics["disk_total_gb"] = round(disk.total / (1024 ** 3), 2)
-    metrics["disk_percent"] = disk.percent
-
-    thermal = Path("/sys/class/thermal/thermal_zone0/temp")
-    if thermal.exists():
-        try:
-            raw = int(thermal.read_text().strip())
-            metrics["temp_c"] = round(raw / 1000.0, 1)
-        except (OSError, ValueError):
-            pass
-    return metrics
 
 
 class PlayBody(BaseModel):
     query: str = Field(min_length=1)
 
 
-def create_app(state: AppState, player: Player, engine: VoiceEngine) -> FastAPI:
+def create_app(
+    state: AppState,
+    player: Player,
+    engine: VoiceEngine,
+    bridge: Any | None = None,
+) -> FastAPI:
     app = FastAPI(title="AI Music Player Dashboard", docs_url=None, redoc_url=None)
     expected_token = os.environ.get("DASHBOARD_TOKEN", "").strip()
 
@@ -91,17 +61,39 @@ def create_app(state: AppState, player: Player, engine: VoiceEngine) -> FastAPI:
         html = html.replace("__DASHBOARD_TOKEN__", safe_token)
         return HTMLResponse(html)
 
+    @app.get("/live", response_class=HTMLResponse)
+    def live(_: None = Depends(require_auth)) -> HTMLResponse:
+        html = (TEMPLATES_DIR / "live.html").read_text(encoding="utf-8")
+        safe_token = expected_token.replace("\\", "\\\\").replace('"', '\\"')
+        return HTMLResponse(html.replace("__DASHBOARD_TOKEN__", safe_token))
+
+    @app.get("/api/ubidots")
+    def ubidots_values(_: None = Depends(require_auth)) -> JSONResponse:
+        if bridge is None:
+            return JSONResponse(
+                {"sent": {}, "remote": {"enabled": False, "error": "bridge off", "variables": {}}}
+            )
+        return JSONResponse(
+            {
+                "device": bridge.device_label,
+                "connected": bridge.connected,
+                "sent": bridge.build_payload(),
+                "remote": bridge.fetch_remote(),
+            }
+        )
+
     @app.get("/api/status")
     def status(_: None = Depends(require_auth)) -> JSONResponse:
         payload = state.snapshot()
-        payload["system"] = _system_metrics()
+        payload["system"] = system_metrics()
+        payload["playback"] = player.playback_snapshot()
         payload["engine_running"] = engine.running or payload["engine_running"]
         return JSONResponse(payload)
 
     @app.post("/api/pause")
     def pause(_: None = Depends(require_auth)) -> dict[str, str]:
         try:
-            player.pause()
+            player.set_pause(True)
         except PlayerError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
         state.clear_current_track(paused=True)
@@ -111,7 +103,7 @@ def create_app(state: AppState, player: Player, engine: VoiceEngine) -> FastAPI:
     @app.post("/api/resume")
     def resume(_: None = Depends(require_auth)) -> dict[str, str]:
         try:
-            player.resume()
+            player.set_pause(False)
         except PlayerError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
         state.set_status("playing")
@@ -134,14 +126,14 @@ def create_app(state: AppState, player: Player, engine: VoiceEngine) -> FastAPI:
         if not query:
             raise HTTPException(status_code=400, detail="query vazia")
         try:
-            url = find_audio_url(query)
-            player.play(url)
+            audio = find_audio(query)
+            player.play(audio.url)
         except (PlayerError, YouTubeSearchError) as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
         state.record_web_play()
-        state.set_playing(query)
-        state.log(f"Play via dashboard: {query}")
-        return {"ok": "playing", "query": query}
+        state.set_playing(audio.title)
+        state.log(f"Play via dashboard: {audio.title} (busca: {query})")
+        return {"ok": "playing", "query": query, "title": audio.title}
 
     @app.post("/api/engine/start")
     def engine_start(_: None = Depends(require_auth)) -> dict[str, Any]:
