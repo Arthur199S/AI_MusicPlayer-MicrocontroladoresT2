@@ -46,6 +46,12 @@ ponte MQTT opcional para **Ubidots STEM**.
 
 ## 📷 Imagens
 <div align="center">
+
+<img width="350" height="485" alt="image" src="https://github.com/user-attachments/assets/250204d3-8c4e-4a84-882b-8f74589aa4c3" />
+
+Diagrama de Componentes </div> 
+
+<div align="center">
 <img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/565841d5-5790-484b-afd0-103313bc9314" />
 	
 Projeto Final do 2 semestre</div>
