@@ -1,12 +1,70 @@
 # AI Music Player
-
 Tocador de musica controlado por voz, executado em um Raspberry Pi 4. O sistema
 reconhece uma wake word localmente, transcreve o comando com OpenAI
 (`gpt-4o-mini-transcribe`), identifica a musica e a reproduz via YouTube.
 
-Ha tambem um **dashboard local** (FastAPI) com as mesmas metricas de um painel
-IoT (now playing, contador do dia, gauges, latencia, switch de pause) e uma
+Há também um **dashboard local** (FastAPI) com as mesmas métricas de um painel
+IoT (now playing, contador do dia, gauges, latência, switch de pause) e uma
 ponte MQTT opcional para **Ubidots STEM**.
+
+---
+
+## 👥 Membros da Equipe
+
+| Nome | RA |
+|---|---|
+| Arthur Silva Correia | 23.00877-6 |
+| Bruno Ferreira Nishiya | 23.01020-7 |
+| Felipe Kolanian Pasquini | 23.00118-6 |
+| Leonardo Luiz Seixas Iorio | 23.00847-4 |
+| Gustavo Henrique Rivero Pasqualin | 23.00531-9 |
+---
+
+### Tabela de Custos
+
+| Unidades | Componentes | Preço (unitário) | Total |
+| --- | --- | --- | --- |
+| 1 | Microfone MEMS INMP441 I2S Digital Omnidirecional | R$ 40,00 | R$ 40,00 |
+| 1 | Mini Alto-Falante 3W 4 Ohms 40mm | R$ 45,00 | R$ 45,00 |
+| 1 | Mini Módulo Amplificador de Som Estéreo PAM8403 | R$ 15,00 | R$ 15,00 |
+| 1 | Raspberry Pi 4 Model B (8GB) | R$ 1.100,00 | R$ 1.100,00 |
+| 1 | Solda de Estanho | R$ 4,50 | R$ 4,50 |
+| 1 | Fiação Simples de Cobre 30cm | R$ 0,50 | R$ 0,50 |
+| **Total** |  |  | **R$ 1.205,00** |
+
+---
+
+### Tabela de Requisitos
+
+| ID | Requisito | Tipo |
+| --- | --- | --- |
+| UR-01 | Microfone INMP441 para captação de áudio digital I2S | OBRIGATÓRIO |
+| UR-02 | Sistema de áudio amplificado via PAM8403 e mini alto-falante | OBRIGATÓRIO |
+| UR-03 | Processamento central baseado em Raspberry Pi 4 Model B | OBRIGATÓRIO |
+| UR-04 | Luz de sinalização do microcontrolador que demonstra o funcionamento | DESEJÁVEL |
+| UR-05 | Possuir uma bateria para que seja portátil | DESEJAVEL |
+
+## 📷 Imagens
+<div align="center">
+<img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/565841d5-5790-484b-afd0-103313bc9314" />
+	
+Projeto Final do 2 semestre</div>
+
+<div align="center">
+<img width="500" height="375" alt="foto grupo micro" src="https://github.com/user-attachments/assets/af3462fa-8281-49e3-a44f-4bcbba260fb6" />
+	
+Foto dos integrantes do grupo</div>
+
+
+---
+
+## Vídeo de Funcionamento do Projeto
+
+<div align="center">
+ <video src="https://github.com/user-attachments/assets/72640697-6121-428d-ae0c-d26be3eda3ca" width="600" controls="controls"></video>
+  <br>
+  Demonstração do Projeto
+</div>
 
 ## Objetivo
 
@@ -14,17 +72,17 @@ Permitir comandos como:
 
 > Assistente, tocar Evidencias do Chitaozinho e Xororo
 
-O projeto e desenvolvido em Python, com modulos independentes para facilitar
+O projeto e desenvolvido em Python, com módulos independentes para facilitar
 testes e futuras alteracoes.
 
 ## Estado atual
 
 O MVP usa:
 
-- **Vosk** (local) so para detectar a wake word (`assistente` / `jarvis` e variantes)
+- **Vosk** (local) só para detectar a wake word (`assistente` / `jarvis` e variantes)
 - **OpenAI** `gpt-4o-mini-transcribe` para converter o comando em texto
-- Interpretacao por regras em Python
-- Busca com `yt-dlp` (URL + **titulo real** do YouTube) e reproducao com `mpv`
+- Interpretação por regras em Python
+- Busca com `yt-dlp` (URL + **título real** do YouTube) e reprodução com `mpv`
 - Dashboard web local com telemetria e controles
 - Bridge MQTT opcional para Ubidots STEM (telemetria + Pause/Continuar)
 
